@@ -1,0 +1,126 @@
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+        "172.19.0.1/30",
+        "fdfe:dcba:9876::1/126"
+      ],
+      "mtu": 1280,
+      "auto_route": true,
+      "stack": "mixed"
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "selector",
+      "tag": "lan-select",
+      "outbounds": [
+        "vless-out",
+        "hy2-out"
+      ],
+      "default": "hy2-out",
+      "interrupt_exist_connections": true
+    },
+    {
+      "type": "vless",
+      "tag": "vless-out",
+      "server": "io.180899.xyz",
+      "server_port": 53742,
+      "uuid": "83d50ae2-b114-4723-7b56a4efae9a",
+      "flow": "xtls-rprx-vision",
+      "packet_encoding": "xudp",
+      "tls": {
+        "enabled": true,
+        "server_name": "www.bilibili.com",
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        },
+        "reality": {
+          "enabled": true,
+          "public_key": "YN3fococOIfwheEdSvldIP76Pnf",
+          "short_id": "8207f460"
+        }
+      }
+    },
+    {
+      "type": "hysteria2",
+      "tag": "hy2-out",
+      "server": "io.180899.xyz",
+      "server_port": 53743,
+      "password": "Ykn6rjMLSInCs7yLvaY0up_8MoRzoBcJHF",
+      "obfs": {
+        "type": "salamander",
+        "password": "wjMkDKqi5jFAIske1AdJuDqHqLjx0UsOsRJp"
+      },
+      "tls": {
+        "enabled": true,
+        "server_name": "io.180899.xyz",
+        "insecure": true
+      }
+    },
+    {
+      "type": "socks",
+      "tag": "mihomo-out",
+      "server": "10.0.0.20",
+      "server_port": 7890,
+      "version": "5",
+      "detour": "lan-select"
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": {
+    "auto_detect_interface": false,
+    "rules": [
+      {
+        "action": "sniff"
+      },
+      {
+        "domain": ["io.180899.xyz"],
+        "outbound": "direct"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      }
+    ],
+    "final": "mihomo-out"
+  },
+  "dns": {
+    "servers": [
+      {
+        "tag": "bootstrap-dns",
+        "address": "223.5.5.5",
+        "detour": "direct"
+      },
+      {
+        "tag": "mihomo-dns",
+        "address": "tcp://10.0.0.20",
+        "detour": "lan-select"
+      }
+    ],
+    "rules": [
+      {
+        "outbound": ["any"],
+        "server": "bootstrap-dns"
+      },
+      {
+        "domain": ["io.180899.xyz"],
+        "server": "bootstrap-dns"
+      }
+    ],
+    "final": "mihomo-dns",
+    "strategy": "prefer_ipv4",
+    "reverse_mapping": true,
+    "cache_capacity": 4096
+  }
+}
