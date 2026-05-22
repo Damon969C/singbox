@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import os
 import re
@@ -63,14 +64,6 @@ LAN_ROUTE_RULES = [
 ]
 
 SERVER_CONFIG_NAME = "sing-box-server.json"
-CLIENT_CONFIG_NAMES = {
-    "vless-10": "vless-10.json",
-    "vless-lan": "vless-lan.json",
-    "vless-mihomo": "vless-mihomo.json",
-    "hy2-10": "hy2-10.json",
-    "hy2-lan": "hy2-lan.json",
-    "hy2-mihomo": "hy2-mihomo.json",
-}
 SUMMARY_NAME = "sing-box-secrets.txt"
 HY2_CERT_NAME = "sing-box-hy2-cert.pem"
 HY2_KEY_NAME = "sing-box-hy2-key.pem"
@@ -535,15 +528,220 @@ def build_client_config(params: SingBoxParams, secrets_value: SingBoxSecrets) ->
     return build_client_lan_config(params, secrets_value)
 
 
+
+def build_client_cn_proxy_config(
+    params: SingBoxParams,
+    secrets_value: SingBoxSecrets,
+    *,
+    default_tunnel: str = "hy2-out",
+) -> dict:
+    dns_config = {
+        "servers": [
+            {
+                "type": "udp",
+                "tag": BOOTSTRAP_DNS_TAG,
+                "server": BOOTSTRAP_DNS_SERVER,
+                "server_port": 53,
+            },
+            {
+                "type": "udp",
+                "tag": "local-dns",
+                "server": "8.8.8.8",
+                "server_port": 53,
+            },
+            {
+                "type": "tcp",
+                "tag": REMOTE_DNS_TAG,
+                "server": REMOTE_DNS_SERVER,
+                "server_port": 53,
+                "detour": "lan-select",
+            },
+        ],
+        "rules": [
+            {
+                "rule_set": ["geosite-cn"],
+                "server": REMOTE_DNS_TAG,
+            }
+        ],
+        "final": "local-dns",
+        "strategy": "prefer_ipv4",
+        "reverse_mapping": True,
+        "cache_capacity": 4096,
+    }
+    
+    route_rules = [
+        {
+            "action": "sniff",
+        },
+        {
+            "protocol": "dns",
+            "action": "hijack-dns",
+        },
+        {
+            "rule_set": ["geosite-cn", "geoip-cn"],
+            "outbound": "lan-select",
+        },
+    ]
+
+    config = build_base_client_config(
+        params,
+        secrets_value,
+        default_tunnel=default_tunnel,
+        route_address=GLOBAL_ROUTE_CIDRS,
+        route_rules=route_rules,
+        final="direct",
+        dns_config=dns_config,
+        default_domain_resolver=BOOTSTRAP_DOMAIN_RESOLVER,
+    )
+    
+    config["route"]["rule_set"] = [
+        {
+            "type": "remote",
+            "tag": "geoip-cn",
+            "format": "binary",
+            "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
+        },
+        {
+            "type": "remote",
+            "tag": "geosite-cn",
+            "format": "binary",
+            "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
+        },
+    ]
+    
+    return config
+
+def build_client_cn_direct_config(
+    params: SingBoxParams,
+    secrets_value: SingBoxSecrets,
+    *,
+    default_tunnel: str = "hy2-out",
+) -> dict:
+    dns_config = {
+        "servers": [
+            {
+                "type": "udp",
+                "tag": BOOTSTRAP_DNS_TAG,
+                "server": BOOTSTRAP_DNS_SERVER,
+                "server_port": 53,
+            },
+            {
+                "type": "udp",
+                "tag": "local-dns",
+                "server": "119.29.29.29",
+                "server_port": 53,
+            },
+            {
+                "type": "tcp",
+                "tag": REMOTE_DNS_TAG,
+                "server": REMOTE_DNS_SERVER,
+                "server_port": 53,
+                "detour": "lan-select",
+            },
+        ],
+        "rules": [
+            {
+                "rule_set": ["geosite-cn"],
+                "server": "local-dns",
+            }
+        ],
+        "final": REMOTE_DNS_TAG,
+        "strategy": "prefer_ipv4",
+        "reverse_mapping": True,
+        "cache_capacity": 4096,
+    }
+    
+    route_rules = [
+        {
+            "action": "sniff",
+        },
+        {
+            "protocol": "dns",
+            "action": "hijack-dns",
+        },
+        {
+            "rule_set": ["geosite-cn", "geoip-cn"],
+            "outbound": "direct",
+        },
+    ]
+
+    config = build_base_client_config(
+        params,
+        secrets_value,
+        default_tunnel=default_tunnel,
+        route_address=GLOBAL_ROUTE_CIDRS,
+        route_rules=route_rules,
+        final="lan-select",
+        dns_config=dns_config,
+        default_domain_resolver=BOOTSTRAP_DOMAIN_RESOLVER,
+    )
+    
+    config["route"]["rule_set"] = [
+        {
+            "type": "remote",
+            "tag": "geoip-cn",
+            "format": "binary",
+            "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
+        },
+        {
+            "type": "remote",
+            "tag": "geosite-cn",
+            "format": "binary",
+            "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
+        },
+    ]
+    
+    return config
+
+def transform_to_1_11_ios(config: dict, server_domain: str) -> dict:
+    cfg = copy.deepcopy(config)
+    for inbound in cfg.get("inbounds", []):
+        if inbound.get("type") == "tun":
+            inbound.pop("interface_name", None)
+            inbound.pop("strict_route", None)
+            inbound.pop("auto_redirect", None)
+            if "route_address" in inbound and "0.0.0.0/1" in inbound["route_address"]:
+                inbound.pop("route_address", None)
+    if "route" in cfg:
+        cfg["route"]["auto_detect_interface"] = False
+        cfg["route"].pop("default_domain_resolver", None)
+    for outbound in cfg.get("outbounds", []):
+        outbound.pop("domain_resolver", None)
+    if "dns" in cfg:
+        servers = cfg["dns"].get("servers", [])
+        for srv in servers:
+            server_ip = srv.pop("server", None)
+            if server_ip:
+                srv["address"] = server_ip
+            srv_type = srv.pop("type", "udp")
+            srv.pop("server_port", None)
+            if srv_type == "tcp" and server_ip and not server_ip.startswith("tcp://"):
+                srv["address"] = f"tcp://{server_ip}"
+            if not srv.get("detour"):
+                srv["detour"] = "direct"
+        rules = cfg["dns"].get("rules", [])
+        proxy_domain_rule = {"domain": [server_domain], "server": "bootstrap-dns"}
+        any_rule = {"outbound": ["any"], "server": "bootstrap-dns"}
+        cfg["dns"]["rules"] = [any_rule, proxy_domain_rule] + rules
+    return cfg
+
 def build_client_configs(params: SingBoxParams, secrets_value: SingBoxSecrets) -> dict[str, dict]:
-    return {
+
+    configs = {
         "vless-10": build_client_lan_config(params, secrets_value, default_tunnel="vless-out"),
         "vless-lan": build_client_global_lan_config(params, secrets_value, default_tunnel="vless-out"),
         "vless-mihomo": build_client_global_mihomo_config(params, secrets_value, default_tunnel="vless-out"),
         "hy2-10": build_client_lan_config(params, secrets_value, default_tunnel="hy2-out"),
         "hy2-lan": build_client_global_lan_config(params, secrets_value, default_tunnel="hy2-out"),
         "hy2-mihomo": build_client_global_mihomo_config(params, secrets_value, default_tunnel="hy2-out"),
+        "hy2-cn-proxy": build_client_cn_proxy_config(params, secrets_value, default_tunnel="hy2-out"),
+        "hy2-cn-direct": build_client_cn_direct_config(params, secrets_value, default_tunnel="hy2-out"),
     }
+    variants_1_11 = ["hy2-10", "hy2-lan", "hy2-mihomo", "hy2-cn-proxy", "hy2-cn-direct"]
+    for base_name in variants_1_11:
+        if base_name in configs:
+            configs[f"{base_name}-1.11"] = transform_to_1_11_ios(configs[base_name], params.server_domain)
+    return configs
 
 
 def write_json_file(path: Path, data: dict):
@@ -573,7 +771,7 @@ hy2_key_path: {paths.hy2_key_path}
 
 vless-10 / hy2-10: only routes {", ".join(LAN_CIDRS)}
 vless-lan / hy2-lan: routes all traffic to the sing-box server LAN egress
-vless-mihomo / hy2-mihomo: routes all traffic to {MIHOMO_SERVER}:{MIHOMO_MIXED_PORT} over the tunnel
+vless-mihomo / hy2-mihomo: routes all traffic to {MIHOMO_SERVER}:{MIHOMO_MIXED_PORT} over the tunnel\nhy2-cn-proxy: Return to China scenario, mainland IPs/domains via proxy\nhy2-cn-direct: Bypass China scenario, mainland IPs/domains direct\n*-1.11.json: Special configuration tailored for iOS sing-box 1.11.4 core
 """
     path.write_text(summary, encoding="utf-8")
 
@@ -621,9 +819,11 @@ def write_bundle(
 ) -> BundlePaths:
     output_dir = output_dir.resolve()
     server_config_path = output_dir / SERVER_CONFIG_NAME
+    
+    client_configs = build_client_configs(params, secrets_value)
     client_config_paths = {
-        name: output_dir / filename
-        for name, filename in CLIENT_CONFIG_NAMES.items()
+        name: output_dir / f"{name}.json"
+        for name in client_configs.keys()
     }
     summary_path = output_dir / SUMMARY_NAME
     hy2_cert_path = output_dir / HY2_CERT_NAME
@@ -647,8 +847,6 @@ def write_bundle(
         cert_path=str(hy2_cert_path),
         key_path=str(hy2_key_path),
     )
-    client_configs = build_client_configs(params, secrets_value)
-
     write_json_file(server_config_path, server_config)
     for name, client_config in client_configs.items():
         write_json_file(client_config_paths[name], client_config)
