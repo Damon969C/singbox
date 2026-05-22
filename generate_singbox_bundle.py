@@ -731,16 +731,17 @@ def build_client_configs(params: SingBoxParams, secrets_value: SingBoxSecrets) -
         "vless-10": build_client_lan_config(params, secrets_value, default_tunnel="vless-out"),
         "vless-lan": build_client_global_lan_config(params, secrets_value, default_tunnel="vless-out"),
         "vless-mihomo": build_client_global_mihomo_config(params, secrets_value, default_tunnel="vless-out"),
+        "vless-cn-proxy": build_client_cn_proxy_config(params, secrets_value, default_tunnel="vless-out"),
+        "vless-cn-direct": build_client_cn_direct_config(params, secrets_value, default_tunnel="vless-out"),
         "hy2-10": build_client_lan_config(params, secrets_value, default_tunnel="hy2-out"),
         "hy2-lan": build_client_global_lan_config(params, secrets_value, default_tunnel="hy2-out"),
         "hy2-mihomo": build_client_global_mihomo_config(params, secrets_value, default_tunnel="hy2-out"),
         "hy2-cn-proxy": build_client_cn_proxy_config(params, secrets_value, default_tunnel="hy2-out"),
         "hy2-cn-direct": build_client_cn_direct_config(params, secrets_value, default_tunnel="hy2-out"),
     }
-    variants_1_11 = ["hy2-10", "hy2-lan", "hy2-mihomo", "hy2-cn-proxy", "hy2-cn-direct"]
-    for base_name in variants_1_11:
-        if base_name in configs:
-            configs[f"{base_name}-1.11"] = transform_to_1_11_ios(configs[base_name], params.server_domain)
+    base_names = list(configs.keys())
+    for base_name in base_names:
+        configs[f"{base_name}-1.11"] = transform_to_1_11_ios(configs[base_name], params.server_domain)
     return configs
 
 
