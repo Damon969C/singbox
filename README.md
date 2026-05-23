@@ -50,7 +50,7 @@
 
 ```bash
 # 执行生成脚本（以你的域名和端口为例）
-python3 generate_singbox_bundle.py --domain io.180899.xyz --vless-port 53742 --hy2-port 53743 -o ./output
+python3 generate_singbox_bundle.py --domain example.com --vless-port 53742 --hy2-port 53743 -o ./output
 
 # 脚本将会自动在 output 目录下生成服务端配置与各种分类好的客户端配置。
 ```
