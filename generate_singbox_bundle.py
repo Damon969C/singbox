@@ -942,10 +942,14 @@ def write_bundle(
     server_config_path = output_dir / SERVER_CONFIG_NAME
     
     client_configs = build_client_configs(params, secrets_value)
-    client_config_paths = {
-        name: output_dir / f"{name}.json"
-        for name in client_configs.keys()
-    }
+    client_config_paths = {}
+    for name in client_configs.keys():
+        if name.endswith("-1.11"):
+            clean_name = name[:-5]
+            client_config_paths[name] = output_dir / "1.11" / f"{clean_name}.json"
+        else:
+            client_config_paths[name] = output_dir / "1.13" / f"{name}.json"
+
     summary_path = output_dir / SUMMARY_NAME
     hy2_cert_path = output_dir / HY2_CERT_NAME
     hy2_key_path = output_dir / HY2_KEY_NAME
