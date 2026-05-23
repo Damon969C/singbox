@@ -628,14 +628,14 @@ def build_client_cn_direct_config(
             {
                 "type": "udp",
                 "tag": "local-dns",
-                "server": "119.29.29.29",
+                "server": "180.76.76.76",
                 "server_port": 53,
             },
             {
                 "type": "tcp",
-                "tag": REMOTE_DNS_TAG,
-                "server": REMOTE_DNS_SERVER,
-                "server_port": 53,
+                "tag": MIHOMO_DNS_TAG,
+                "server": MIHOMO_SERVER,
+                "server_port": MIHOMO_DNS_PORT,
                 "detour": "lan-select",
             },
         ],
@@ -645,7 +645,7 @@ def build_client_cn_direct_config(
                 "server": "local-dns",
             }
         ],
-        "final": REMOTE_DNS_TAG,
+        "final": MIHOMO_DNS_TAG,
         "strategy": "prefer_ipv4",
         "reverse_mapping": True,
         "cache_capacity": 4096,
@@ -663,6 +663,11 @@ def build_client_cn_direct_config(
             "rule_set": ["geosite-cn", "geoip-cn"],
             "outbound": "direct",
         },
+        {
+            "ip_cidr": LAN_CIDRS,
+            "action": "route",
+            "outbound": "lan-select",
+        },
     ]
 
     config = build_base_client_config(
@@ -671,9 +676,19 @@ def build_client_cn_direct_config(
         default_tunnel=default_tunnel,
         route_address=GLOBAL_ROUTE_CIDRS,
         route_rules=route_rules,
-        final="lan-select",
+        final="mihomo-out",
         dns_config=dns_config,
         default_domain_resolver=BOOTSTRAP_DOMAIN_RESOLVER,
+        extra_outbounds=[
+            {
+                "type": "socks",
+                "tag": "mihomo-out",
+                "server": MIHOMO_SERVER,
+                "server_port": MIHOMO_MIXED_PORT,
+                "version": "5",
+                "detour": "lan-select",
+            },
+        ],
     )
     
     config["route"]["rule_set"] = [
