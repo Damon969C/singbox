@@ -581,6 +581,11 @@ def build_client_cn_proxy_config(
             "rule_set": ["geosite-cn", "geoip-cn"],
             "outbound": "lan-select",
         },
+        {
+            "ip_cidr": LAN_CIDRS,
+            "action": "route",
+            "outbound": "lan-select",
+        },
     ]
 
     config = build_base_client_config(
