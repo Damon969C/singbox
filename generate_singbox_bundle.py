@@ -216,7 +216,12 @@ def build_server_config(
                 },
             },
         ],
-        "outbounds": [],
+        "outbounds": [
+            {
+                "type": "direct",
+                "tag": "direct",
+            }
+        ],
         "route": {
             "final": "direct",
         },
@@ -413,6 +418,14 @@ def build_base_client_config(
     ]
     if extra_outbounds:
         outbounds.extend(extra_outbounds)
+    outbounds.extend(
+        [
+            {
+                "type": "direct",
+                "tag": "direct",
+            }
+        ]
+    )
 
     config = {
         "log": {
