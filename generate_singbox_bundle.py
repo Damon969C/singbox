@@ -216,16 +216,7 @@ def build_server_config(
                 },
             },
         ],
-        "outbounds": [
-            {
-                "type": "direct",
-                "tag": "direct",
-            },
-            {
-                "type": "block",
-                "tag": "block",
-            },
-        ],
+        "outbounds": [],
         "route": {
             "final": "direct",
         },
@@ -422,18 +413,7 @@ def build_base_client_config(
     ]
     if extra_outbounds:
         outbounds.extend(extra_outbounds)
-    outbounds.extend(
-        [
-            {
-                "type": "direct",
-                "tag": "direct",
-            },
-            {
-                "type": "block",
-                "tag": "block",
-            },
-        ]
-    )
+
     config = {
         "log": {
             "level": "info",
