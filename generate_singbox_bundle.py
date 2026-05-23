@@ -708,6 +708,104 @@ def build_client_cn_direct_config(
     
     return config
 
+def build_client_cn_direct_safe_config(
+    params: SingBoxParams,
+    secrets_value: SingBoxSecrets,
+    *,
+    default_tunnel: str = "hy2-out",
+) -> dict:
+    dns_config = {
+        "servers": [
+            {
+                "type": "udp",
+                "tag": BOOTSTRAP_DNS_TAG,
+                "server": BOOTSTRAP_DNS_SERVER,
+                "server_port": 53,
+            },
+            {
+                "type": "tcp",
+                "tag": "local-dns",
+                "server": LAN_DNS_SERVER,
+                "server_port": 53,
+                "detour": "lan-select",
+            },
+            {
+                "type": "tcp",
+                "tag": MIHOMO_DNS_TAG,
+                "server": MIHOMO_SERVER,
+                "server_port": MIHOMO_DNS_PORT,
+                "detour": "lan-select",
+            },
+        ],
+        "rules": [
+            {
+                "rule_set": ["geosite-cn"],
+                "server": "local-dns",
+            }
+        ],
+        "final": MIHOMO_DNS_TAG,
+        "strategy": "prefer_ipv4",
+        "reverse_mapping": True,
+        "cache_capacity": 4096,
+    }
+    
+    route_rules = [
+        {
+            "action": "sniff",
+        },
+        {
+            "protocol": "dns",
+            "action": "hijack-dns",
+        },
+        {
+            "rule_set": ["geosite-cn", "geoip-cn"],
+            "outbound": "direct",
+        },
+        {
+            "ip_cidr": LAN_CIDRS,
+            "action": "route",
+            "outbound": "lan-select",
+        },
+    ]
+
+    config = build_base_client_config(
+        params,
+        secrets_value,
+        default_tunnel=default_tunnel,
+        route_address=GLOBAL_ROUTE_CIDRS,
+        route_rules=route_rules,
+        final="mihomo-out",
+        dns_config=dns_config,
+        default_domain_resolver=BOOTSTRAP_DOMAIN_RESOLVER,
+        extra_outbounds=[
+            {
+                "type": "socks",
+                "tag": "mihomo-out",
+                "server": MIHOMO_SERVER,
+                "server_port": MIHOMO_MIXED_PORT,
+                "version": "5",
+                "detour": "lan-select",
+            },
+        ],
+    )
+    
+    config["route"]["rule_set"] = [
+        {
+            "type": "remote",
+            "tag": "geoip-cn",
+            "format": "binary",
+            "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
+        },
+        {
+            "type": "remote",
+            "tag": "geosite-cn",
+            "format": "binary",
+            "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
+        },
+    ]
+    
+    return config
+
 def transform_to_1_11_ios(config: dict, server_domain: str) -> dict:
     cfg = copy.deepcopy(config)
     for inbound in cfg.get("inbounds", []):
@@ -748,11 +846,13 @@ def build_client_configs(params: SingBoxParams, secrets_value: SingBoxSecrets) -
         "vless-mihomo": build_client_global_mihomo_config(params, secrets_value, default_tunnel="vless-out"),
         "vless-cn-proxy": build_client_cn_proxy_config(params, secrets_value, default_tunnel="vless-out"),
         "vless-cn-direct": build_client_cn_direct_config(params, secrets_value, default_tunnel="vless-out"),
+        "vless-cn-direct-safe": build_client_cn_direct_safe_config(params, secrets_value, default_tunnel="vless-out"),
         "hy2-10": build_client_lan_config(params, secrets_value, default_tunnel="hy2-out"),
         "hy2-lan": build_client_global_lan_config(params, secrets_value, default_tunnel="hy2-out"),
         "hy2-mihomo": build_client_global_mihomo_config(params, secrets_value, default_tunnel="hy2-out"),
         "hy2-cn-proxy": build_client_cn_proxy_config(params, secrets_value, default_tunnel="hy2-out"),
         "hy2-cn-direct": build_client_cn_direct_config(params, secrets_value, default_tunnel="hy2-out"),
+        "hy2-cn-direct-safe": build_client_cn_direct_safe_config(params, secrets_value, default_tunnel="hy2-out"),
     }
     base_names = list(configs.keys())
     for base_name in base_names:
